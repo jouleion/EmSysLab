@@ -9,6 +9,7 @@ module TopEntity_tb;
   wire led2;
 
   integer i;
+  integer j;
 
   TopEntity dut (
       .clk(clk),
@@ -40,27 +41,34 @@ module TopEntity_tb;
     #5;
     btn1 = 0;
 
-    // Simulate CCW rotation (Counterclockwise)
-    for (i = 0; i < 4; i = i + 1) begin
-      case (i)
-        0: {PITCH_DIRA, PITCH_DIRB} = 2'b00;
-        1: {PITCH_DIRA, PITCH_DIRB} = 2'b01;
-        2: {PITCH_DIRA, PITCH_DIRB} = 2'b11;
-        3: {PITCH_DIRA, PITCH_DIRB} = 2'b10;
-      endcase
-      #10;
+
+ // Simulate CW rotation (Clockwise)
+    for (j = 0; j < 10; j = j + 1) begin
+      for (i = 0; i < 4; i = i + 1) begin
+        case (i)
+          0: {PITCH_DIRA, PITCH_DIRB} = 2'b00;
+          1: {PITCH_DIRA, PITCH_DIRB} = 2'b10;
+          2: {PITCH_DIRA, PITCH_DIRB} = 2'b11;
+          3: {PITCH_DIRA, PITCH_DIRB} = 2'b01;
+        endcase
+        #10;
+      end
     end
 
-    // Simulate CW rotation (Clockwise)
-    for (i = 0; i < 4; i = i + 1) begin
-      case (i)
-        0: {PITCH_DIRA, PITCH_DIRB} = 2'b00;
-        1: {PITCH_DIRA, PITCH_DIRB} = 2'b10;
-        2: {PITCH_DIRA, PITCH_DIRB} = 2'b11;
-        3: {PITCH_DIRA, PITCH_DIRB} = 2'b01;
-      endcase
-      #10;
+    // Simulate CCW rotation (Counterclockwise)
+    for (j = 0; j < 5; j = j + 1) begin
+      for (i = 0; i < 4; i = i + 1) begin
+        case (i)
+          0: {PITCH_DIRA, PITCH_DIRB} = 2'b00;
+          1: {PITCH_DIRA, PITCH_DIRB} = 2'b01;
+          2: {PITCH_DIRA, PITCH_DIRB} = 2'b11;
+          3: {PITCH_DIRA, PITCH_DIRB} = 2'b10;
+        endcase
+        #10;
+      end
     end
+
+   
 
     #500; // Allow time for simulation
     $finish;  // End simulation
