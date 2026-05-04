@@ -1,3 +1,5 @@
+# spi has to off for flashing
+sudo dtparam spi=off
 
 yosys -p 'synth_ice40 -top TopEntity -json ice40.json' TopEntity.v
 
@@ -8,3 +10,5 @@ icepack ice40.asc ice40.bin
 ../icoprog/icoprog -R
 
 ../icoprog/icoprog -p < ice40.bin
+
+sudo dtparam spi=on
