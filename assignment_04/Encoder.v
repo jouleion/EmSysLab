@@ -1,8 +1,7 @@
 module Encoder(
     input       FPGA_CLK1_50,
-	input 	 	[3:0] SW
-    output reg  [3:0] LED,		// clockwise direction indication
-
+     input      [3:0] SW,        // as a manual reset line.
+    output reg  [7:0] LED        // clockwise direction indication
 );
 
 // State of state machine, bits correspond to A and B dir.
@@ -17,10 +16,9 @@ parameter steps_per_revolution = 1;
 reg [1:0] current_state = S00;
 reg [1:0] previous_state = S00;
 
-// Combine PITCH_DIRA and PITCH_DIRB into a 2-bit vector
-wire [1:0] dir;
-// assign dir = {PITCH_DIRA, PITCH_DIRB};
-assign dir = {SW[0], SW[1]};
+// Combine SW[0] and SW[1] into a 2-bit vector
+wire [1:0] inputAB;
+assign inputAB = {SW[0], SW[1]};
 
 // Counter for steps and display
 reg [7:0] steps = 0; 
@@ -29,88 +27,80 @@ reg [7:0] previous_steps = 0;
 // Sequential logic: state update and counter/LEDs on clock edge
 always @(posedge FPGA_CLK1_50) begin
 
-	if(btn1) begin
-		SW[0] <= 0;
-		SW[1] <= 0;
-		current_state <= S00;
-		previous_state <= S00;
-		steps <= 0;
-		previous_steps <= 0;
-	end
+    if(SW[2]) begin
+        LED[1] <= 0;
+        LED[2] <= 0;
+        current_state <= S00;
+        previous_state <= S00;
+        steps <= 0;
+        previous_steps <= 0;
+    end
 
-	// Save previous state for edge detection
-	previous_state <= current_state;
-	previous_steps <= steps;
+    // Save previous state for edge detection
+    previous_state <= current_state;
+    previous_steps <= steps;
 
-	// Compute next state (combinational logic folded into sequential)
-	case (current_state)
-		S00: begin
-			if (dir == S10) begin
-				current_state <= S10;
-				steps <= steps + 1;
-			end else if (dir == S01) begin
-				current_state <= S01;
-				steps <= steps - 1;
-			end else begin
-				current_state <= S00;
-			end
-		end
-		S01: begin
-			if (dir == S11) begin 
-				current_state <= S11;
-				steps <= steps + 1;
-			end else if (dir == S00) begin
-				current_state <= S00;
-				steps <= steps - 1;
-			end else begin
-				current_state <= S01;
-			end
-		end
-		S10: begin
-			if (dir == S00) begin
-				current_state <= S00;
-				steps <= steps - 1;
-			end else if (dir == S11) begin
-				current_state <= S11;
-				steps <= steps + 1;
-			end else begin
-				current_state <= S10;
-			end
-		end
-		S11: begin
-			if (dir == S01) begin
-				current_state <= S01;
-				steps <= steps + 1;
-			end else if (dir == S10) begin
-				current_state <= S10;
-				steps <= steps - 1;
-			end else begin
-				current_state <= S11;
-			end
-		end
-		default: current_state <= S00;
-	endcase
+    // Compute next state (combinational logic folded into sequential)
+    case (current_state)
+        S00: begin
+            if (inputAB == S10) begin
+                current_state <= S10;
+                steps <= steps + 1;
+            end else if (inputAB == S01) begin
+                current_state <= S01;
+                steps <= steps - 1;
+            end else begin
+                current_state <= S00;
+            end
+        end
+        S01: begin
+            if (inputAB == S11) begin 
+                current_state <= S11;
+                steps <= steps + 1;
+            end else if (inputAB == S00) begin
+                current_state <= S00;
+                steps <= steps - 1;
+            end else begin
+                current_state <= S01;
+            end
+        end
+        S10: begin
+            if (inputAB == S00) begin
+                current_state <= S00;
+                steps <= steps - 1;
+            end else if (inputAB == S11) begin
+                current_state <= S11;
+                steps <= steps + 1;
+            end else begin
+                current_state <= S10;
+            end
+        end
+        S11: begin
+            if (inputAB == S01) begin
+                current_state <= S01;
+                steps <= steps + 1;
+            end else if (inputAB == S10) begin
+                current_state <= S10;
+                steps <= steps - 1;
+            end else begin
+                current_state <= S11;
+            end
+        end
+        default: current_state <= S00;
+    endcase
 
-	// Assign an LED to indicate the direction of rotation.
-	if(previous_steps < steps) begin
-		// Clockwise
-		// SW[0] <= 1; 
-		// SW[1] <= 0;
-	end else if (previous_steps > steps) begin
-		// Counterclockwise
-		// SW[0] <= 0;
-		// SW[1] <= 1; 
-	end
+    // Assign an LED to indicate the direction of rotation.
+    //if(previous_steps < steps) begin
+        // Clockwise
+        // LED[1] <= 1; 
+        // LED[2] <= 0;
+    //end else if (previous_steps > steps) begin
+        // Counterclockwise
+        // LED[1] <= 0;
+        // LED[2] <= 1; 
+    //end
 
-	if(steps / steps_per_revolution >= 1) begin
-		SW[0] <= 1; // Turn on SW[0] for one revolution
-		SW[1] <= 0;
-	end else if (steps / steps_per_revolution <= -1) begin
-		SW[0] <= 0;
-		SW[1] <= 1; // Turn on SW[1] for one revolution in the opposite direction
-	end else begin
-		SW[0] <= 0;
-		SW[1] <= 0; // Both LEDs off when less than one revolution
-	end
+    // just write to the binary output.
+    LED <= steps;
 end
 endmodule
