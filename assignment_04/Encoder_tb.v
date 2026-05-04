@@ -47,17 +47,17 @@ module Encoder_tb;
     end
 
     // Simulate CCW rotation (Counterclockwise)
-    for (j = 0; j < 5; j = j + 1) begin
-      for (i = 0; i < 4; i = i + 1) begin
-        case (i)
-          0: {SW[0], SW[1]} = 2'b00;
-          1: {SW[0], SW[1]} = 2'b01;
-          2: {SW[0], SW[1]} = 2'b11;
-          3: {SW[0], SW[1]} = 2'b10;
-        endcase
-        #10;
-      end
-    end
+    // for (j = 0; j < 5; j = j + 1) begin
+    //   for (i = 0; i < 4; i = i + 1) begin
+    //     case (i)
+    //       0: {SW[0], SW[1]} = 2'b00;
+    //       1: {SW[0], SW[1]} = 2'b01;
+    //       2: {SW[0], SW[1]} = 2'b11;
+    //       3: {SW[0], SW[1]} = 2'b10;
+    //     endcase
+    //     #10;
+    //   end
+    // end
 
     #500; // Allow time for simulation
     $finish;  // End simulation
