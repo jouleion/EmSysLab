@@ -35,7 +35,7 @@ module Encoder_tb;
     #0;
 
     // Simulate CW rotation (Clockwise)
-    // for (j = 0; j < 10; j = j + 1) begin
+    for (j = 0; j < 5; j = j + 1) begin
       for (i = 0; i < 4; i = i + 1) begin
         case (i)
           0: {SW[0], SW[1]} = 2'b00;
@@ -45,26 +45,28 @@ module Encoder_tb;
         endcase
         #10;
       end
-    // end
+    end
 
         // Initialize inputs
     SW = 4'b0000;
 
     // Reset the system
     SW[2] = 1;
-    #5;
+    #10;
     SW[2] = 0;
     #0;
 
-    // Simulate CW rotation (Clockwise)
-    for (i = 0; i < 4; i = i + 1) begin
-    case (i)
-        0: {SW[0], SW[1]} = 2'b00;
-        1: {SW[0], SW[1]} = 2'b01;
-        2: {SW[0], SW[1]} = 2'b11;
-        3: {SW[0], SW[1]} = 2'b10;
-    endcase
-    #10;
+
+    for (j = 0; j < 5; j = j + 1) begin
+        for (i = 0; i < 4; i = i + 1) begin
+        case (i)
+            0: {SW[0], SW[1]} = 2'b00;
+            1: {SW[0], SW[1]} = 2'b01;
+            2: {SW[0], SW[1]} = 2'b11;
+            3: {SW[0], SW[1]} = 2'b10;
+        endcase
+        #10;
+        end
     end
 
     // Simulate CCW rotation (Counterclockwise)
