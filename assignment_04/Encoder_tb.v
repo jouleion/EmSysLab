@@ -3,7 +3,7 @@
 module Encoder_tb;
   reg FPGA_CLK1_50;
   reg [3:0] SW;
-  reg [7:0] LED;
+  wire [7:0] LED; // Changed from reg to wire
 
   integer i;
   integer j;
@@ -23,7 +23,7 @@ module Encoder_tb;
   // Testbench script
   initial begin
     $dumpfile("signals.vcd");  // Name of the signal dump file
-    $dumpvars(0, TopEntity_tb);  // Signals to dump
+    $dumpvars(0, Encoder_tb);  // Updated to reference Encoder_tb
 
     // Initialize inputs
     SW = 4'b0000;
@@ -33,8 +33,7 @@ module Encoder_tb;
     #5;
     SW[2] = 0;
 
-
- // Simulate CW rotation (Clockwise)
+    // Simulate CW rotation (Clockwise)
     for (j = 0; j < 10; j = j + 1) begin
       for (i = 0; i < 4; i = i + 1) begin
         case (i)
