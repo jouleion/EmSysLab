@@ -1,6 +1,6 @@
 `include "Encoder.v" // Include YOUR entity.
 `timescale 1ns / 1ps  // Time unit = period, precision
-module TopEntity_tb;
+module Encoder_tb;
   reg FPGA_CLK1_50;
   reg [3:0] SW;
   reg [7:0] LED;
@@ -8,7 +8,7 @@ module TopEntity_tb;
   integer i;
   integer j;
 
-  TopEntity dut (
+  Encoder dut (
       .FPGA_CLK1_50(FPGA_CLK1_50),
       .SW(SW),
       .LED(LED)
