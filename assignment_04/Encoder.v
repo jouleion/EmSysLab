@@ -56,10 +56,10 @@ always @(posedge FPGA_CLK1_50) begin
         S01: begin
             if (inputAB == S11) begin 
                 current_state <= S11;
-                steps <= steps + 1;
+                steps <= steps - 1;
             end else if (inputAB == S00) begin
                 current_state <= S00;
-                steps <= steps - 1;
+                steps <= steps + 1;
             end else begin
                 current_state <= S01;
             end
@@ -70,7 +70,7 @@ always @(posedge FPGA_CLK1_50) begin
                 steps <= steps - 1;
             end else if (inputAB == S11) begin
                 current_state <= S11;
-                steps <= steps + 1;
+                steps <= steps - 1;
             end else begin
                 current_state <= S10;
             end
