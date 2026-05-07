@@ -71,12 +71,13 @@ always @(posedge FPGA_CLK1_50) begin
 			end
 		end
 		S10: begin
+            // flipped these
 			if (inputAB == S00) begin
 				current_state <= S00;
-				steps <= steps - 8'd1;
+				steps <= steps + 8'd1;
 			end else if (inputAB == S11) begin
 				current_state <= S11;
-				steps <= steps + 8'd1;
+				steps <= steps - 8'd1;
 			end else begin
 				current_state <= S10;
 			end
