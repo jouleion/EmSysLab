@@ -29,9 +29,9 @@ module Encoder_tb;
     SW = 4'b0000;
 
     // Reset the system
-    SW[2] = 1;
+    SW[3] = 1;
     #5;
-    SW[2] = 0;
+    SW[3] = 0;
     #0;
 
     // Simulate CW rotation (Clockwise)
@@ -51,9 +51,9 @@ module Encoder_tb;
     SW = 4'b0000;
 
     // Reset the system
-    SW[2] = 1;
+    SW[3] = 1;
     #10;
-    SW[2] = 0;
+    SW[3] = 0;
     #0;
 
 
