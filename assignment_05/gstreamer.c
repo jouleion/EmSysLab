@@ -66,7 +66,12 @@ main (int   argc,
 {
   GMainLoop *loop;
 
-  GstElement *pipeline, *source, *jpeg, *jpegdec, *raw, *filesink; 
+  // gstreamer elements
+  GstElement *pipeline, *source, *jpeg_filter, *decoder, *i420_filter, *filesink; 
+
+  // caps filters for specific file formats.
+  GstCaps *jpeg_caps, *i420_caps;
+
   GstBus *bus;
   guint bus_watch_id;
 
@@ -75,31 +80,65 @@ main (int   argc,
 
   loop = g_main_loop_new (NULL, FALSE);
 
-
-  /* Check input arguments */
-  if (argc != 2) {
-    g_printerr ("Usage: %s < filename>\n", argv[0]);
-    return -1;
-  }
-
-
+  // create the elements
+  pipeline        = gst_pipeline_new ("video-dump");
+  
   /* Create gstreamer elements */
-  pipeline = gst_pipeline_new ("video-dump");
-  source   = gst_element_factory_make ("v4l2src",       "video-source");
-  jpeg     = gst_element_factory_make ("image/jpeg",      "jpeg input");
-  decoder  = gst_element_factory_make ("jpegdec",     "jpeg-decoder");
-  raw      = gst_element_factory_make ("video/x-raw",  "convert-to-i420");
-  filesink = gst_element_factory_make ("filesink", "file-sink");
+  source          = gst_element_factory_make ("v4l2src",       "video-source");
+  jpeg_filter     = gst_element_factory_make ("capsfilter",      "jpeg input");
+  decoder         = gst_element_factory_make ("jpegdec",     "jpeg-decoder");
+  i420_filter     = gst_element_factory_make ("capsfilter",  "convert-to-i420");
+  filesink        = gst_element_factory_make ("filesink", "file-sink");
 
-  if (!pipeline || !source || !jpeg || !decoder || !raw || !filesink) {
-    g_printerr ("One element could not be created. Exiting.\n");
+  /* Set up the caps filters */
+  // jpeg, 640x480, 30fps
+  jpeg_caps = gst_caps_new_simple ("image/jpeg",
+    "width", G_TYPE_INT, 640,
+    "height", G_TYPE_INT, 480,
+    "framerate", GST_TYPE_FRACTION, 30, 1,
+    NULL
+  );
+
+  // i420, 640x480, 30fps
+  i420_caps = gst_caps_new_simple ("video/x-raw",
+    "format", G_TYPE_STRING, "I420",
+    "width", G_TYPE_INT, 640,
+    "height", G_TYPE_INT, 480,
+    NULL
+  );
+
+  // set the caps filters to the capsfilter elements
+  g_object_set (G_OBJECT (jpeg_filter), "caps", jpeg_caps, NULL);
+  g_object_set (G_OBJECT (i420_filter), "caps", i420_caps, NULL);
+
+  // set the source and filesink properties
+  g_object_set (G_OBJECT (source), "device", "/dev/video0", NULL);
+  g_object_set (G_OBJECT (filesink), "location", "file1.yuv", NULL);
+
+  if (!pipeline){
+    g_printerr ("Pipeline could not be created. Exiting.\n");
+    return -1;
+  } if(!source){
+    g_printerr ("Source element could not be created. Exiting.\n");
+    return -1;
+  } if(!jpeg_filter){
+    g_printerr ("JPEG filter element could not be created. Exiting.\n");
+    return -1;
+  } if(!decoder){
+    g_printerr ("Decoder element could not be created. Exiting.\n");
+    return -1;
+  } if(!i420_filter){
+    g_printerr ("I420 filter element could not be created. Exiting.\n");
+    return -1;
+  } if(!filesink){
+    g_printerr ("Filesink element could not be created. Exiting.\n");
     return -1;
   }
 
   /* Set up the pipeline */
 
   /* we set the input filename to the source element */
-  g_object_set (G_OBJECT (source), "location", argv[1], NULL);
+  // g_object_set (G_OBJECT (source), "location", argv[1], NULL);
 
   /* we add a message handler */
   bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
@@ -108,12 +147,12 @@ main (int   argc,
 
   /* we add all elements into the pipeline */
   gst_bin_add_many (GST_BIN (pipeline),
-                    source, jpeg, decoder, raw, filesink, NULL);
+                    source, jpeg_filter, decoder, i420_filter, filesink, NULL);
 
   /* we link the elements together */
-  gst_element_link (source, jpeg);
-  gst_element_link_many (jpeg, decoder, raw, filesink, NULL);
-  g_signal_connect (jpeg, "pad-added", G_CALLBACK (on_pad_added), decoder);
+  // gst_element_link (source, jpeg);
+  gst_element_link_many (source, jpeg_filter, decoder, i420_filter, filesink, NULL);
+  // g_signal_connect (jpeg, "pad-added", G_CALLBACK (on_pad_added), decoder);
 
   /* note that the demuxer will be linked to the decoder dynamically.
      The reason is that Ogg may contain various streams (for example
