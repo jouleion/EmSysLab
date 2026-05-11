@@ -1,7 +1,7 @@
 #include <gst/gst.h>
 #include <glib.h>
 
-// v4l2src > image/jpeg, jpegdec > video/raw I420 > filesink
+// v4l2src > image/jpeg, jpegdec > video/raw I420 > appsink
 // make this command as a script
 //  gst-launch-1.0 -v -e v4l2src device=/dev/video0 !   image/jpeg,width=640,height=480,framerate=30/1 !   jpegdec !   video/x-raw,format=I420 !   filesink location=file.yuv
 
@@ -61,7 +61,7 @@ on_pad_added (GstElement *element,
 
 
 int
-main (int   argc,
+gstreamer (int   argc,
       char *argv[])
 {
   GMainLoop *loop;
@@ -182,4 +182,21 @@ main (int   argc,
   g_main_loop_unref (loop);
 
   return 0;
+}
+
+
+
+
+int main (int   argc,
+      char *argv[])
+{
+  // on thread 1 run the gstreamer pipeline
+  gstreamer (argc, argv);
+
+  // on thread 2 run the analysis of video frames after a the previous frame has been processed.
+  analysis();
+
+  // then more periodically update the leds and motors.
+  // update_motors();
+  update_leds();
 }
