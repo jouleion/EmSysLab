@@ -1,9 +1,10 @@
 #include <gst/gst.h>
 #include <glib.h>
+#include <gst/app/gstappsink.h>
 
 // v4l2src > image/jpeg, jpegdec > video/raw I420 > appsink
 // make this command as a script
-//  gst-launch-1.0 -v -e v4l2src device=/dev/video0 !   image/jpeg,width=640,height=480,framerate=30/1 !   jpegdec !   video/x-raw,format=I420 !   filesink location=file.yuv
+//  gst-launch-1.0 -v -e v4l2src device=/dev/video0 !   image/jpeg,width=640,height=480,framerate=30/1 !   jpegdec !   video/x-raw,format=I420 !   appsink location=file.yuv
 
 static gboolean
 bus_call (GstBus     *bus,
@@ -47,6 +48,8 @@ on_pad_added (GstElement *element,
 {
   GstPad *sinkpad;
   GstElement *decoder = (GstElement *) data;
+  GstElement *appsink;
+
 
   /* We can now link this pad with the vorbis-decoder sink pad */
   g_print ("Dynamic pad created, linking demuxer/decoder\n");
@@ -61,13 +64,13 @@ on_pad_added (GstElement *element,
 
 
 int
-gstreamer (int   argc,
+main (int   argc,
       char *argv[])
 {
   GMainLoop *loop;
 
   // gstreamer elements
-  GstElement *pipeline, *source, *jpeg_filter, *decoder, *i420_filter, *filesink; 
+  GstElement *pipeline, *source, *jpeg_filter, *decoder, *i420_filter, *appsink; 
 
   // caps filters for specific file formats.
   GstCaps *jpeg_caps, *i420_caps;
@@ -88,7 +91,7 @@ gstreamer (int   argc,
   jpeg_filter     = gst_element_factory_make ("capsfilter",      "jpeg input");
   decoder         = gst_element_factory_make ("jpegdec",     "jpeg-decoder");
   i420_filter     = gst_element_factory_make ("capsfilter",  "convert-to-i420");
-  filesink        = gst_element_factory_make ("filesink", "file-sink");
+  appsink        = gst_element_factory_make ("appsink", "app-sink");
 
   /* Set up the caps filters */
   // jpeg, 640x480, 30fps
@@ -111,9 +114,11 @@ gstreamer (int   argc,
   g_object_set (G_OBJECT (jpeg_filter), "caps", jpeg_caps, NULL);
   g_object_set (G_OBJECT (i420_filter), "caps", i420_caps, NULL);
 
-  // set the source and filesink properties
+  // set the source and appsink properties
   g_object_set (G_OBJECT (source), "device", "/dev/video0", NULL);
-  g_object_set (G_OBJECT (filesink), "location", "file1.yuv", NULL);
+  //g_object_set (G_OBJECT (appsink), "location", "file1.yuv", NULL);
+  g_object_set (G_OBJECT(appsink), "emit-signals", TRUE, "sync", FALSE, NULL);
+  g_signal_connect (appsink, "new-sample", G_CALLBACK(on_new_sample), NULL);
 
   if (!pipeline){
     g_printerr ("Pipeline could not be created. Exiting.\n");
@@ -130,8 +135,8 @@ gstreamer (int   argc,
   } if(!i420_filter){
     g_printerr ("I420 filter element could not be created. Exiting.\n");
     return -1;
-  } if(!filesink){
-    g_printerr ("Filesink element could not be created. Exiting.\n");
+  } if(!appsink){
+    g_printerr ("appsink element could not be created. Exiting.\n");
     return -1;
   }
 
@@ -147,11 +152,11 @@ gstreamer (int   argc,
 
   /* we add all elements into the pipeline */
   gst_bin_add_many (GST_BIN (pipeline),
-                    source, jpeg_filter, decoder, i420_filter, filesink, NULL);
+                    source, jpeg_filter, decoder, i420_filter, appsink, NULL);
 
   /* we link the elements together */
   // gst_element_link (source, jpeg);
-  gst_element_link_many (source, jpeg_filter, decoder, i420_filter, filesink, NULL);
+  gst_element_link_many (source, jpeg_filter, decoder, i420_filter, appsink, NULL);
   // g_signal_connect (jpeg, "pad-added", G_CALLBACK (on_pad_added), decoder);
 
   /* note that the demuxer will be linked to the decoder dynamically.
@@ -182,21 +187,4 @@ gstreamer (int   argc,
   g_main_loop_unref (loop);
 
   return 0;
-}
-
-
-
-
-int main (int   argc,
-      char *argv[])
-{
-  // on thread 1 run the gstreamer pipeline
-  gstreamer (argc, argv);
-
-  // on thread 2 run the analysis of video frames after a the previous frame has been processed.
-  analysis();
-
-  // then more periodically update the leds and motors.
-  // update_motors();
-  update_leds();
 }
