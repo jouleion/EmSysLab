@@ -16,7 +16,7 @@ module PWM_Motordriver (
   localparam PWM_PERIOD_COUNT = CLK_FREQUENCY / PWM_FREQUENCY;
 
   reg [31:0] loop_count = 0;  // current loop count
-  reg [16:0] duty_cycle_loop = 0; // loop cycle when PWM should be off
+  reg [31:0] duty_cycle_loop = 0; // loop cycle when PWM should be off
 
   always @(posedge clk) begin
     loop_count <= loop_count + 1;
@@ -30,7 +30,7 @@ module PWM_Motordriver (
       // calculate at which cycle the PWM signal should be turned off.
       duty_cycle_loop <= (speed_percentage * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER);
 
-      if(enabled) begin
+      if(enable) begin
         // if enabled
         if(breaking) begin
           // if breaking, set A and B to 0, break to ground.
@@ -48,9 +48,13 @@ module PWM_Motordriver (
         end
       end else begin
         // if not enabled, turn off the motor.
+        signalA <= 0;
+        signalB <= 0;
         PWM_signal <= 0;
       end    
-    end else (loop_count >= duty_cycle_loop) begin
+    end 
+    
+    if (loop_count >= duty_cycle_loop) begin
       // turn off
       PWM_signal <= 0;
     end
@@ -60,4 +64,5 @@ module PWM_Motordriver (
       loop_count <= 0;
     end
   end
+
 endmodule
