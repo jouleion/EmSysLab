@@ -7,7 +7,7 @@ module PWM_Motordriver (
 
     output reg signalA = 0,
     output reg signalB = 0,
-    output reg PWM_signal = 0,
+    output reg PWM_signal = 0
 );
 
   parameter CLK_FREQUENCY = 50_000_000; // 50 MHz
