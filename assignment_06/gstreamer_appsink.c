@@ -63,6 +63,7 @@ FrameBuffer* get_write_buffer()
 
             // advance rotary position
             write_index = (index + 1) % NUM_BUFFERS;
+			printf("Writing to buffer %d\n", index);
 
             return &buffers[index];
         }
@@ -109,6 +110,7 @@ FrameBuffer* get_read_buffer()
 
             // advance rotary position
             read_index = (index + 1) % NUM_BUFFERS;
+			printf("Reading from buffer %d\n", index);
 
             return &buffers[index];
         }
@@ -161,6 +163,66 @@ bus_call (GstBus *bus,
     }
 
     return TRUE;
+}
+
+
+static GstFlowReturn
+on_new_sample(GstElement *sink, gpointer data)
+{
+    // Load new sample into a free buffer slot in the FrameBuffer array.
+    // mapping is used to acces the buffer data.
+    // handle errors, and unreference the sample when done to prevent memory leaks.
+
+    GstSample *sample;
+    GstBuffer *buffer;
+    GstMapInfo map;
+
+    // get the new sample
+    sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
+
+    if (!sample) {
+        g_printerr("Could not pull sample from appsink\n");
+        return GST_FLOW_ERROR;
+    }
+
+    // load sample data into the buffer
+    buffer = gst_sample_get_buffer(sample);
+
+    // get the buffer data via mapping (this works by mapping the buffer into this applications memory space)
+    if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+
+        pthread_mutex_lock(&buffer_mutex);
+
+        // get a write buffer
+        FrameBuffer *write_buffer = get_write_buffer();
+
+        if (write_buffer) {
+
+            // copy the data into the buffer
+            memcpy(write_buffer->data, map.data, FRAME_SIZE);
+
+            // mark buffer as ready for analysis
+            write_buffer->state = 1;
+
+            // wake analysis thread
+            pthread_cond_signal(&frame_cond);
+        }
+        else {
+            g_printerr("No writable buffer available\n");
+        }
+
+        pthread_mutex_unlock(&buffer_mutex);
+
+        gst_buffer_unmap(buffer, &map);
+    }
+    else {
+        g_printerr("Could not map buffer\n");
+    }
+
+    // unreference the sample (this will free the sample and its buffer if no other references exist)
+    gst_sample_unref(sample);
+
+    return GST_FLOW_OK;
 }
 
 bool setup_gstreamer_pipeline(GMainLoop **loop, GstElement **pipeline)
@@ -276,64 +338,6 @@ bool setup_gstreamer_pipeline(GMainLoop **loop, GstElement **pipeline)
     return true;
 }
 
-static GstFlowReturn
-on_new_sample(GstElement *sink, gpointer data)
-{
-    // Load new sample into a free buffer slot in the FrameBuffer array.
-    // mapping is used to acces the buffer data.
-    // handle errors, and unreference the sample when done to prevent memory leaks.
-
-    GstSample *sample;
-    GstBuffer *buffer;
-    GstMapInfo map;
-
-    // get the new sample
-    sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
-
-    if (!sample) {
-        g_printerr("Could not pull sample from appsink\n");
-        return GST_FLOW_ERROR;
-    }
-
-    // load sample data into the buffer
-    buffer = gst_sample_get_buffer(sample);
-
-    // get the buffer data via mapping (this works by mapping the buffer into this applications memory space)
-    if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
-
-        pthread_mutex_lock(&buffer_mutex);
-
-        // get a write buffer
-        FrameBuffer *write_buffer = get_write_buffer();
-
-        if (write_buffer) {
-
-            // copy the data into the buffer
-            memcpy(write_buffer->data, map.data, FRAME_SIZE);
-
-            // mark buffer as ready for analysis
-            write_buffer->state = 1;
-
-            // wake analysis thread
-            pthread_cond_signal(&frame_cond);
-        }
-        else {
-            g_printerr("No writable buffer available\n");
-        }
-
-        pthread_mutex_unlock(&buffer_mutex);
-
-        gst_buffer_unmap(buffer, &map);
-    }
-    else {
-        g_printerr("Could not map buffer\n");
-    }
-
-    // unreference the sample (this will free the sample and its buffer if no other references exist)
-    gst_sample_unref(sample);
-
-    return GST_FLOW_OK;
-}
 
 int analyze_frame(uint8_t *data, size_t size)
 {
@@ -360,7 +364,12 @@ int analyze_frame(uint8_t *data, size_t size)
             uint8_t u_val = U[uv_index];
             uint8_t v_val = V[uv_index];
 
-            if (u_val < 100 && v_val < 100)
+			if(y == HEIGHT / 2 && x == WIDTH / 2) {
+				printf("Pixel (%d, %d): U=%d, V=%d\n", x, y, u_val, v_val);
+			}
+
+            // lower left quadrant
+            if (u_val < 130 && v_val < 90)
             {
                 counter++;
             }
