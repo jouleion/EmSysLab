@@ -33,60 +33,61 @@ module PWM_Motordriver_tb;
     $dumpvars(0, PWM_Motordriver_tb);
   end
 
-  // task 1: set inputs
-  task set_inputs;
-    input r_dir;
-    input r_enable;
-    input [6:0] r_speed;
+  task write_inputs(input reg dir_val, input reg enable_val, input reg breaking_val, input reg [6:0] speed_val);
     begin
-      dir = r_dir;
-      enable = r_enable;
-      speed_percentage = r_speed;
+      dir = dir_val;
+      enable = enable_val;
+      breaking = breaking_val;
+      speed_percentage = speed_val;
+      #100; // wait for 100 ns
     end
   endtask
 
-  // task 2: wait time
-  task wait_time;
-    input integer t;
+  task check_outputs(input reg expected_signalA, input reg expected_signalB, input reg expected_PWM);
     begin
-      #t;
-    end
-  endtask
-
-  // task 3: check direction only
-  task check_dir;
-    input expA;
-    input expB;
-    begin
-      if (signalA !== expA || signalB !== expB) begin
-        $display("FAIL: A=%b B=%b", signalA, signalB);
-        $stop;
+      if (signalA !== expected_signalA) begin
+        $display("FAIL: signalA is %b, expected %b", signalA, expected_signalA);
+        $finish;
+      end
+      if (signalB !== expected_signalB) begin
+        $display("FAIL: signalB is %b, expected %b", signalB, expected_signalB);
+        $finish;
+      end
+      if (PWM_signal !== expected_PWM) begin
+        $display("FAIL: PWM_signal is %b, expected %b", PWM_signal, expected_PWM);
+        $finish;
       end
     end
   endtask
 
   initial begin
+    // case 1, dir = 0, enable = 0, breaking = 0, speed = 0 (should have no PWM)
+    write_inputs(0, 0, 0, 0);
+    check_outputs(0, 0, 0);
 
-    set_inputs(0, 0, 0);
-    wait_time(20);
+    // case 2, dir = 0, enable = 0, breaking = 0, speed = 50   (should have no PWM)
+    write_inputs(0, 0, 0, 50);
+    check_outputs(0, 0, 0);
+    // case 3, dir = 0, enable = 1, breaking = 0, speed = 50   (should have PWM with 10% duty cycle)
+    write_inputs(0, 1, 0, 50);
+    check_outputs(0, 0, 1);
 
-    set_inputs(0, 1, 20);
-    wait_time(200);
+    // case 4, dir = 1, enable = 1, breaking = 0, speed = 100  (should have PWM with 20% duty cycle)
+    write_inputs(1, 1, 0, 100);
+    check_outputs(1, 0, 1);
 
-    check_dir(0, 1);
+    // other direction
+    // case 5, dir = 1, enable = 0, breaking = 0, speed = 50   (should have no PWM)
+    write_inputs(1, 0, 0, 50);
+    check_outputs(0, 1, 0);
 
-    set_inputs(1, 1, 20);
-    wait_time(200);
+    // case 6, dir = 1, enable = 1, breaking = 0, speed = 100  (should have PWM with 20% duty cycle)
+    write_inputs(1, 1, 0, 100);
+    check_outputs(1, 0, 1);
 
-    check_dir(1, 0);
-
-    set_inputs(1, 1, 80);
-    wait_time(200);
-
-    set_inputs(0, 0, 0);
-    wait_time(200);
-
-    check_dir(0, 0);
+    // case 7, dir = 1, enable = 1, breaking = 1, speed = 100  (should have PWM, A and B should be 0)
+    write_inputs(1, 1, 1, 100);
+    check_outputs(0, 0, 1);
 
     $display("PASS");
     $finish;
