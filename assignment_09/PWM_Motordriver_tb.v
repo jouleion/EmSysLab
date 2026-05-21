@@ -31,15 +31,11 @@ module PWM_Motordriver_tb;
     forever #5 clk = ~clk;
   end
 
-  // ---------------- SPI CLOCK (SLOW, CLEAN EDGES) ----------------
-  task spi_pulse;
+  // ---------------- SPI CLOCK (MODE 0 SAFE) ----------------
+  task spi_tick;
     begin
-      SPI_CLK = 0;
-      #200;
-      SPI_CLK = 1;
-      #200;
-      SPI_CLK = 0;
-      #200;
+      #200 SPI_CLK = 1;
+      #200 SPI_CLK = 0;
     end
   endtask
 
@@ -49,7 +45,9 @@ module PWM_Motordriver_tb;
     begin
       for (i = 7; i >= 0; i = i - 1) begin
         SPI_PICO = data[i];
-        spi_pulse();
+        #50;          // setup time BEFORE clock edge
+        spi_tick();   // rising edge sampled by DUT
+        #50;          // hold time AFTER edge
       end
     end
   endtask
@@ -63,16 +61,20 @@ module PWM_Motordriver_tb;
       control[6] = dir;
       control[5] = brake;
 
-      SPI_CS = 0;
-      #100;
+      SPI_CLK  = 0;
+      SPI_PICO = 0;
+
+      #500;
+      SPI_CS = 0;   // ASSERT CS BEFORE FIRST BIT
+      #500;
 
       spi_send_byte(control);
       spi_send_byte(speed);
 
-      #100;
-      SPI_CS = 1;
+      #500;
+      SPI_CS = 1;   // DEASSERT
 
-      #5000; // let PWM run
+      #5000;
     end
   endtask
 
@@ -81,23 +83,15 @@ module PWM_Motordriver_tb;
     $dumpfile("signals.vcd");
     $dumpvars(0, PWM_Motordriver_tb);
 
-    // init SPI
     SPI_CLK  = 0;
     SPI_PICO = 0;
     SPI_CS   = 1;
 
-    #1000;
+    #2000;
 
-    // enable, dir=0, speed low
     send_motor(1, 0, 0, 8'd20);
-
-    // enable, dir=1, speed high
     send_motor(1, 1, 0, 8'd80);
-
-    // brake
     send_motor(1, 1, 1, 8'd50);
-
-    // disable
     send_motor(0, 0, 0, 8'd0);
 
     #20000;
