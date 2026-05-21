@@ -11,7 +11,7 @@ module PWM_Motordriver (
     output reg PITCH_PWM_VAL = 0
 );
 
-  parameter SPEED_DIVITDER = 4;
+  parameter SPEED_DIVIDER = 4;
   parameter CLK_FREQUENCY = 50_000_000;
   parameter PWM_FREQUENCY = 20_000;
   localparam PWM_PERIOD_COUNT = CLK_FREQUENCY / PWM_FREQUENCY;
@@ -61,15 +61,15 @@ module PWM_Motordriver (
 
           if (byte_select == 0) begin
             control_byte <= spi_shift;
+            debug_control_byte <= spi_shift; // Debugging
             byte_select <= 1;
           end else begin
             speed_byte <= spi_shift;
             byte_select <= 0;
-
             enable   <= control_byte[7];
+            debug_enable <= control_byte[7]; // Debugging
             dir      <= control_byte[6];
             breaking <= control_byte[5];
-
             speed_percentage <= speed_byte[6:0];
           end
         end else begin
@@ -88,18 +88,18 @@ module PWM_Motordriver (
   always @(posedge clk) begin
     loop_count <= loop_count + 1;
 
-    if(loop_count > 0) begin
+    if (loop_count > 0) begin
       PITCH_PWM_VAL <= 1;
 
       duty_cycle_loop <= (speed_percentage * PWM_PERIOD_COUNT) /
-                         (100 * SPEED_DIVITDER);
+                         (100 * SPEED_DIVIDER);
 
-      if(enable) begin
-        if(breaking) begin
+      if (enable) begin
+        if (breaking) begin
           PITCH_DIRA <= 0;
           PITCH_DIRB <= 0;
         end else begin
-          if(dir) begin
+          if (dir) begin
             PITCH_DIRA <= 1;
             PITCH_DIRB <= 0;
           end else begin
@@ -121,5 +121,9 @@ module PWM_Motordriver (
       loop_count <= 0;
 
   end
+
+  // Added debugging signals for enable and control_byte
+  output reg debug_enable = 0;
+  output reg [7:0] debug_control_byte = 0;
 
 endmodule

@@ -34,8 +34,8 @@ module PWM_Motordriver_tb;
   // ---------------- SPI CLOCK (MODE 0 SAFE) ----------------
   task spi_tick;
     begin
-      #200 SPI_CLK = 1;
-      #200 SPI_CLK = 0;
+      #100 SPI_CLK = 1; // Shortened clock high time for better alignment
+      #100 SPI_CLK = 0; // Shortened clock low time for better alignment
     end
   endtask
 
@@ -89,10 +89,10 @@ module PWM_Motordriver_tb;
 
     #2000;
 
-    send_motor(1, 0, 0, 8'd20);
-    send_motor(1, 1, 0, 8'd80);
-    send_motor(1, 1, 1, 8'd50);
-    send_motor(0, 0, 0, 8'd0);
+    send_motor(1, 0, 0, 8'd20); // Enable motor, forward direction, no brake
+    send_motor(1, 1, 0, 8'd80); // Enable motor, reverse direction, no brake
+    send_motor(1, 1, 1, 8'd50); // Enable motor, reverse direction, brake
+    send_motor(0, 0, 0, 8'd0);  // Disable motor
 
     #20000;
     $finish;
