@@ -35,36 +35,41 @@ module PWM_Motordriver (
   reg byte_select = 0; // 0 = control, 1 = speed
 
   // SPI (no async reset on CS, clean edge handling)
-  always @(negedge SPI_CS or posedge SPI_CLK) begin
 
-    if (!SPI_CS) begin
+
+always @(negedge SPI_CS or posedge SPI_CLK) begin
+
+  if (!SPI_CS) begin
+    spi_bit_count <= 0;
+    byte_select   <= 0;
+    spi_shift     <= 0;
+  end else begin
+
+    spi_shift <= {spi_shift[6:0], SPI_PICO};
+
+    if (spi_bit_count == 3'd7) begin
       spi_bit_count <= 0;
-      byte_select <= 0;
-    end else begin
 
-      spi_shift <= {spi_shift[6:0], SPI_PICO};
-      spi_bit_count <= spi_bit_count + 1;
+      if (byte_select == 0) begin
+        control_byte <= spi_shift;
+        byte_select  <= 1;
+      end else begin
+        speed_byte <= spi_shift;
+        byte_select <= 0;
 
-      if (spi_bit_count == 3'd7) begin
+        enable   <= control_byte[7];
+        dir      <= control_byte[6];
+        breaking <= control_byte[5];
 
-        if (byte_select == 0) begin
-          control_byte <= spi_shift;
-          byte_select <= 1;
-        end else begin
-          speed_byte <= spi_shift;
-          byte_select <= 0;
-
-          enable   <= control_byte[7];
-          dir      <= control_byte[6];
-          breaking <= control_byte[5];
-
-          speed_percentage <= speed_byte[6:0];
-        end
-
-        spi_bit_count <= 0;
+        speed_percentage <= speed_byte[6:0];
       end
+
+    end else begin
+      spi_bit_count <= spi_bit_count + 1;
     end
+
   end
+end
   
   reg [31:0] loop_count = 0;  // current loop count
   reg [31:0] duty_cycle_loop = 0; // loop cycle when PWM should be off
