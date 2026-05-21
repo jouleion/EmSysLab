@@ -57,10 +57,10 @@ module PWM_Motordriver_tb;
     reg [7:0] control;
     begin
       control = 0;
-      // New encoding: bit6 = enable, bit5 = dir, bit4 = brake
-      control[6] = enable;
-      control[5] = dir;
-      control[4] = brake;
+      // Updated encoding: bit5 = enable, bit4 = dir, bit3 = brake
+      control[5] = enable;
+      control[4] = dir;
+      control[3] = brake;
 
       SPI_CLK  = 0;
       SPI_PICO = 0;
