@@ -34,9 +34,9 @@ module PWM_Motordriver (
 
   reg byte_select = 0; // 0 = control, 1 = speed
 
-  always @(negedge SPI_CS or posedge SPI_CLK) begin
+  always @(posedge SPI_CLK or posedge SPI_CS) begin
 
-    if (!SPI_CS) begin
+    if (SPI_CS) begin
       spi_bit_count <= 0;
       byte_select   <= 0;
       spi_shift     <= 0;
