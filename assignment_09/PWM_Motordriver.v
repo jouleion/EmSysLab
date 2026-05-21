@@ -34,18 +34,18 @@ module PWM_Motordriver (
 
   reg byte_select = 0; // 0 = control, 1 = speed
 
-  always @(posedge SPI_CLK or negedge SPI_CS) begin
+  // SPI (no async reset on CS, clean edge handling)
+  always @(negedge SPI_CS or posedge SPI_CLK) begin
 
     if (!SPI_CS) begin
       spi_bit_count <= 0;
       byte_select <= 0;
-      spi_shift <= 0;
     end else begin
 
       spi_shift <= {spi_shift[6:0], SPI_PICO};
+      spi_bit_count <= spi_bit_count + 1;
 
       if (spi_bit_count == 3'd7) begin
-        spi_bit_count <= 0;
 
         if (byte_select == 0) begin
           control_byte <= spi_shift;
@@ -61,10 +61,8 @@ module PWM_Motordriver (
           speed_percentage <= speed_byte[6:0];
         end
 
-      end else begin
-        spi_bit_count <= spi_bit_count + 1;
+        spi_bit_count <= 0;
       end
-
     end
   end
   
