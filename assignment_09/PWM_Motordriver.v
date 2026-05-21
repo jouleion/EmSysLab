@@ -30,9 +30,23 @@ module PWM_Motordriver (
   reg enable = 0;
   reg breaking = 0;
 
+  // use 6 bits to set the speed percentage.
   reg [6:0] speed_percentage = 0;
 
   reg byte_select = 0; // 0 = control, 1 = speed
+
+  // ---------------- DEBUG SIGNALS (FOR GTKWAVE) ----------------
+  reg [7:0] debug_control_byte = 0;
+  reg [7:0] debug_speed_byte = 0;
+  reg [2:0] debug_bit_count = 0;
+  reg       debug_byte_select = 0;
+
+  reg       debug_enable = 0;
+  reg       debug_dir = 0;
+  reg       debug_breaking = 0;
+  reg [6:0] debug_speed = 0;
+
+  reg       debug_latch_pulse = 0;
 
   always @(posedge SPI_CLK or posedge SPI_CS) begin
 
@@ -59,11 +73,23 @@ module PWM_Motordriver (
           breaking <= control_byte[5];
 
           speed_percentage <= speed_byte[6:0];
+
+          debug_latch_pulse <= ~debug_latch_pulse;
         end
 
       end else begin
         spi_bit_count <= spi_bit_count + 1;
       end
+
+      debug_control_byte <= control_byte;
+      debug_speed_byte   <= speed_byte;
+      debug_bit_count    <= spi_bit_count;
+      debug_byte_select  <= byte_select;
+
+      debug_enable   <= enable;
+      debug_dir      <= dir;
+      debug_breaking <= breaking;
+      debug_speed    <= speed_percentage;
 
     end
   end
@@ -75,13 +101,13 @@ module PWM_Motordriver (
 
     PITCH_PWM_VAL <= 1;
 
-    if(enable) begin
+    if (enable) begin
 
-      if(breaking) begin
+      if (breaking) begin
         PITCH_DIRA <= 0;
         PITCH_DIRB <= 0;
       end else begin
-        if(dir) begin
+        if (dir) begin
           PITCH_DIRA <= 1;
           PITCH_DIRB <= 0;
         end else begin
