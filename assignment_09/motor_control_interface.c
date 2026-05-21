@@ -34,9 +34,10 @@ void spi_send_motor_command(uint8_t control_byte, uint8_t speed_percent) {
 uint8_t build_control_byte(int enable, int direction, int braking) {
     uint8_t control = 0;
 
-    if (enable)   control |= (1 << 7);
-    if (direction) control |= (1 << 6);
-    if (braking)   control |= (1 << 5);
+    // New encoding: bit6 = enable, bit5 = direction, bit4 = braking
+    if (enable)    control |= (1 << 6);
+    if (direction) control |= (1 << 5);
+    if (braking)   control |= (1 << 4);
 
     return control;
 }

@@ -63,10 +63,12 @@ module PWM_Motordriver (
             // Capture control byte and immediately update control signals
             control_byte <= spi_shift;
             debug_control_byte <= spi_shift; // Debugging
-            enable <= spi_shift[7];
-            debug_enable <= spi_shift[7]; // Debugging
-            dir <= spi_shift[6];
-            breaking <= spi_shift[5];
+            // New encoding: shift fields down one bit to avoid bit7
+            // control mapping: bit6 = enable, bit5 = dir, bit4 = breaking
+            enable <= spi_shift[6];
+            debug_enable <= spi_shift[6]; // Debugging
+            dir <= spi_shift[5];
+            breaking <= spi_shift[4];
             byte_select <= 1;
           end else begin
             // Capture speed byte and update speed percentage
