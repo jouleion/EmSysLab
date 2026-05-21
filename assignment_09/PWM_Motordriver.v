@@ -60,17 +60,20 @@ module PWM_Motordriver (
           spi_bit_count <= 0;
 
           if (byte_select == 0) begin
+            // Capture control byte and immediately update control signals
             control_byte <= spi_shift;
             debug_control_byte <= spi_shift; // Debugging
+            enable <= spi_shift[7];
+            debug_enable <= spi_shift[7]; // Debugging
+            dir <= spi_shift[6];
+            breaking <= spi_shift[5];
             byte_select <= 1;
           end else begin
+            // Capture speed byte and update speed percentage
             speed_byte <= spi_shift;
+            debug_speed_byte <= spi_shift; // Debugging
+            speed_percentage <= spi_shift[6:0];
             byte_select <= 0;
-            enable   <= control_byte[7];
-            debug_enable <= control_byte[7]; // Debugging
-            dir      <= control_byte[6];
-            breaking <= control_byte[5];
-            speed_percentage <= speed_byte[6:0];
           end
         end else begin
           spi_bit_count <= spi_bit_count + 1;
@@ -125,5 +128,10 @@ module PWM_Motordriver (
   // Added debugging signals for enable and control_byte
   output reg debug_enable = 0;
   output reg [7:0] debug_control_byte = 0;
+
+  // Additional debugging signals to monitor SPI and control logic
+  output reg [7:0] debug_spi_shift = 0;
+  output reg [2:0] debug_spi_bit_count = 0;
+  output reg [7:0] debug_speed_byte = 0;
 
 endmodule
