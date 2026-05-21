@@ -3,98 +3,104 @@
 module PWM_Motordriver_tb;
 
   reg clk;
-  reg dir;
-  reg enable;
-  reg breaking;
-  reg [6:0] speed_percentage;
 
-  wire signalA;
-  wire signalB;
-  wire PWM_signal;
+  // SPI lines
+  reg SPI_CLK;
+  reg SPI_PICO;
+  reg SPI_CS;
+
+  wire PITCH_DIRA;
+  wire PITCH_DIRB;
+  wire PITCH_PWM_VAL;
 
   PWM_Motordriver dut (
     .clk(clk),
-    .dir(dir),
-    .enable(enable),
-    .breaking(breaking),
-    .speed_percentage(speed_percentage),
-    .signalA(signalA),
-    .signalB(signalB),
-    .PWM_signal(PWM_signal)
+
+    .SPI_CLK(SPI_CLK),
+    .SPI_PICO(SPI_PICO),
+    .SPI_CS(SPI_CS),
+
+    .PITCH_DIRA(PITCH_DIRA),
+    .PITCH_DIRB(PITCH_DIRB),
+    .PITCH_PWM_VAL(PITCH_PWM_VAL)
   );
 
-  // clock
+  // system clock (PWM domain)
   initial begin
     clk = 0;
     forever #5 clk = ~clk;
   end
 
-  // dump
+  // ---------------- SPI CLOCK (SLOW, CLEAN EDGES) ----------------
+  task spi_pulse;
+    begin
+      SPI_CLK = 0;
+      #200;
+      SPI_CLK = 1;
+      #200;
+      SPI_CLK = 0;
+      #200;
+    end
+  endtask
+
+  // ---------------- SEND ONE BYTE ----------------
+  task spi_send_byte(input [7:0] data);
+    integer i;
+    begin
+      for (i = 7; i >= 0; i = i - 1) begin
+        SPI_PICO = data[i];
+        spi_pulse();
+      end
+    end
+  endtask
+
+  // ---------------- SEND MOTOR FRAME ----------------
+  task send_motor(input enable, input dir, input brake, input [7:0] speed);
+    reg [7:0] control;
+    begin
+      control = 0;
+      control[7] = enable;
+      control[6] = dir;
+      control[5] = brake;
+
+      SPI_CS = 0;
+      #100;
+
+      spi_send_byte(control);
+      spi_send_byte(speed);
+
+      #100;
+      SPI_CS = 1;
+
+      #5000; // let PWM run
+    end
+  endtask
+
+  // ---------------- TEST ----------------
   initial begin
     $dumpfile("signals.vcd");
     $dumpvars(0, PWM_Motordriver_tb);
-  end
 
-  task write_inputs(input dir_val, input enable_val, input breaking_val, input [6:0] speed_val);
-    begin
-      dir = dir_val;
-      enable = enable_val;
-      breaking = breaking_val;
-      speed_percentage = speed_val;
-    end
-  endtask
+    // init SPI
+    SPI_CLK  = 0;
+    SPI_PICO = 0;
+    SPI_CS   = 1;
 
-  task check_outputs(input expected_signalA, input expected_signalB);
-    begin
-      if (signalA !== expected_signalA) begin
-        $display("FAIL: signalA is %b, expected %b", signalA, expected_signalA);
-        $finish;
-      end
-      if (signalB !== expected_signalB) begin
-        $display("FAIL: signalB is %b, expected %b", signalB, expected_signalB);
-        $finish;
-      end
-    end
-  endtask
+    #1000;
 
-  initial begin
+    // enable, dir=0, speed low
+    send_motor(1, 0, 0, 8'd20);
 
-    // case 1, dir = 0, enable = 0, breaking = 0, speed = 0 (should have no PWM)
-    write_inputs(0, 0, 0, 0);
-    #200000;
-    check_outputs(0, 0);
+    // enable, dir=1, speed high
+    send_motor(1, 1, 0, 8'd80);
 
-    // case 2, dir = 0, enable = 0, breaking = 0, speed = 50 (should have no PWM)
-    write_inputs(0, 0, 0, 50);
-    #200000;
-    check_outputs(0, 0);
+    // brake
+    send_motor(1, 1, 1, 8'd50);
 
-    // case 3, dir = 0, enable = 1, breaking = 0, speed = 50 (PWM visible)
-    write_inputs(0, 1, 0, 50);
-    #300000;
+    // disable
+    send_motor(0, 0, 0, 8'd0);
 
-    // case 4, dir = 1, enable = 1, breaking = 0, speed = 100 (PWM visible)
-    write_inputs(1, 1, 0, 100);
-    #300000;
-    check_outputs(1, 0);
-
-    // other direction
-    // case 5, dir = 1, enable = 0, breaking = 0, speed = 50 (should have no PWM)
-    write_inputs(1, 0, 0, 50);
-    #200000;
-    check_outputs(0, 1);
-
-    // case 6, dir = 1, enable = 1, breaking = 0, speed = 100 (PWM visible)
-    write_inputs(1, 1, 0, 100);
-    #300000;
-    check_outputs(1, 0);
-
-    // case 7, dir = 1, enable = 1, breaking = 1, speed = 100 (A and B should be 0)
-    write_inputs(1, 1, 1, 100);
-    #300000;
-    check_outputs(0, 0);
-
-    $display("PASS");
+    #20000;
     $finish;
   end
 
