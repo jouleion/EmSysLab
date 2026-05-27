@@ -23,23 +23,25 @@ module PWM_Motordriver (
 
   reg [31:0] loop_count = 0;
   reg [31:0] duty_cycle_loop = 0;
-  reg [31:0] next_count;
-  reg [31:0] next_duty;
+
+  // Combinationally compute duty from the current speed input to avoid
+  // sequential update races. duty_cycle is number of clock cycles PWM is high.
+  wire [31:0] duty_cycle = (speed > 100) ?
+                           ((7'd100 * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER)) :
+                           ((speed * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER));
   
   // Simple, readable PWM logic: counter, duty calc, direction and PWM output
-  // compute next values in temporaries (avoids non-blocking race conditions)
+  // Sequential counter and outputs. Use combinational `duty_cycle` computed
+  // from `speed` for the PWM comparison to avoid update-order problems.
   always @(posedge clk) begin
-    // compute next counter value (wrap at PWM_PERIOD_COUNT)
-    next_count = loop_count + 1;
-    if (next_count >= PWM_PERIOD_COUNT)
-      next_count = 0;
-
-    // clamp speed and compute next duty threshold using current 'speed' input
-    // avoid depending on speed_percentage non-blocking update
-    if (speed > 100)
-      next_duty = (7'd100 * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER);
+    // advance counter and wrap
+    if (loop_count >= PWM_PERIOD_COUNT - 1)
+      loop_count <= 0;
     else
-      next_duty = (speed * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER);
+      loop_count <= loop_count + 1;
+
+    // keep last sampled speed percent for debugging/visibility
+    speed_percentage <= (speed > 8'd100) ? 7'd100 : speed[6:0];
 
     // update direction outputs (based on current inputs)
     if (!enable || brake) begin
@@ -53,16 +55,14 @@ module PWM_Motordriver (
       PITCH_DIRB <= 1;
     end
 
-    // update sequential state
-    loop_count <= next_count;
-    duty_cycle_loop <= next_duty;
-    speed_percentage <= (speed > 8'd100) ? 7'd100 : speed[6:0];
+    // update registered copy of duty for visibility (optional)
+    duty_cycle_loop <= duty_cycle;
 
-    // PWM output uses next_count/next_duty so it's stable within this clock
-    if (!enable || brake || (next_duty == 0))
+    // PWM output: compare current loop counter with combinational duty
+    if (!enable || brake || (duty_cycle == 0))
       PITCH_PWM_VAL <= 0;
     else
-      PITCH_PWM_VAL <= (next_count < next_duty) ? 1 : 0;
+      PITCH_PWM_VAL <= (loop_count < duty_cycle) ? 1 : 0;
   end
 
 endmodule
