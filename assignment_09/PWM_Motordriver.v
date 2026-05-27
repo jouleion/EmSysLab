@@ -12,10 +12,11 @@ module PWM_Motordriver (
   output reg PITCH_PWM_VAL = 0
 );
 
-  // Use a lower default PWM_FREQUENCY for simulation visibility (can be overridden for HW).
-  parameter SPEED_DIVIDER = 5;
+  // Default parameters for hardware: 20 kHz PWM at 50 MHz clock.
+  // Set SPEED_DIVIDER=1 so `speed` (0..100) maps directly to percent.
+  parameter SPEED_DIVIDER = 5; // keep max speed ~20% for safety
   parameter CLK_FREQUENCY = 50_000_000;
-  parameter PWM_FREQUENCY = 1000;
+  parameter PWM_FREQUENCY = 20000;
   localparam PWM_PERIOD_COUNT = CLK_FREQUENCY / PWM_FREQUENCY;
 
   // ---------------- PWM ----------------
