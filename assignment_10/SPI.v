@@ -7,7 +7,7 @@
 // Code is intentionally left uncommented as it is only to demonstrate using the Logic Analyzer for SPI readout,
 // not necessarely a "how-to" on verilog SPI inplementation.
 
-module TopEntity (
+module SPI (
     input  clk,
     input  SPI_CLK,
     input  SPI_PICO,

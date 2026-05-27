@@ -1,7 +1,7 @@
 # spi has to off for flashing
 sudo dtparam spi=off
 
-yosys -p 'synth_ice40 -top PWM_Motordriver -json ice40.json' PWM_Motordriver.v
+yosys -p 'synth_ice40 -top SPI -json ice40.json' SPI.v
 
 nextpnr-ice40 --hx8k --json ice40.json --pcf ico-jiwy.pcf --asc ice40.asc
 
