@@ -23,22 +23,25 @@ module PWM_Motordriver (
 
   reg [31:0] loop_count = 0;
   reg [31:0] duty_cycle_loop = 0;
+  reg [31:0] next_count;
+  reg [31:0] next_duty;
   
   // Simple, readable PWM logic: counter, duty calc, direction and PWM output
+  // compute next values in temporaries (avoids non-blocking race conditions)
   always @(posedge clk) begin
-    // advance counter and wrap
-    if (loop_count == PWM_PERIOD_COUNT - 1)
-      loop_count <= 0;
+    // compute next counter value (wrap at PWM_PERIOD_COUNT)
+    next_count = loop_count + 1;
+    if (next_count >= PWM_PERIOD_COUNT)
+      next_count = 0;
+
+    // clamp speed and compute next duty threshold using current 'speed' input
+    // avoid depending on speed_percentage non-blocking update
+    if (speed > 100)
+      next_duty = (7'd100 * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER);
     else
-      loop_count <= loop_count + 1;
+      next_duty = (speed * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER);
 
-    // clamp speed to 0..100 (store as 7-bit)
-    speed_percentage <= (speed > 8'd100) ? 7'd100 : speed[6:0];
-
-    // compute duty threshold (cycles motor is ON). keep SPEED_DIVIDER for now.
-    duty_cycle_loop <= (speed_percentage * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER);
-
-    // direction / brake / enable handling (kept simple)
+    // update direction outputs (based on current inputs)
     if (!enable || brake) begin
       PITCH_DIRA <= 0;
       PITCH_DIRB <= 0;
@@ -50,11 +53,16 @@ module PWM_Motordriver (
       PITCH_DIRB <= 1;
     end
 
-    // PWM output: active-high while counter < duty
-    if (!enable || brake || (duty_cycle_loop == 0))
+    // update sequential state
+    loop_count <= next_count;
+    duty_cycle_loop <= next_duty;
+    speed_percentage <= (speed > 8'd100) ? 7'd100 : speed[6:0];
+
+    // PWM output uses next_count/next_duty so it's stable within this clock
+    if (!enable || brake || (next_duty == 0))
       PITCH_PWM_VAL <= 0;
     else
-      PITCH_PWM_VAL <= (loop_count < duty_cycle_loop) ? 1 : 0;
+      PITCH_PWM_VAL <= (next_count < next_duty) ? 1 : 0;
   end
 
 endmodule
