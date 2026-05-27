@@ -14,7 +14,7 @@ module PWM_Motordriver (
 
   // Default parameters for hardware: 20 kHz PWM at 50 MHz clock.
   // Set SPEED_DIVIDER=1 so `speed` (0..100) maps directly to percent.
-  parameter SPEED_DIVIDER = 5; // keep max speed ~20% for safety
+  parameter SPEED_DIVIDER = 1; // keep max speed ~20% for safety
   parameter CLK_FREQUENCY = 50_000_000;
   parameter PWM_FREQUENCY = 20000;
   localparam PWM_PERIOD_COUNT = CLK_FREQUENCY / PWM_FREQUENCY;
