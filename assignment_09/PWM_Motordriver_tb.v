@@ -47,18 +47,42 @@ module PWM_Motordriver_tb;
 
     #2000;
 
-    // Test sequence — set raw inputs directly
-    enable = 1; dir = 0; brake = 0; speed = 8'd20; // forward, 20%
-    #5000;
+    // add a simple console monitor
+    $display("time\tenable\tdir\tbrake\tspeed\tPWM\tDIRA\tDIRB");
+    $monitor("%0t\t%b\t%b\t%b\t%0d\t%b\t%b\t%b", $time, enable, dir, brake, speed, PITCH_PWM_VAL, PITCH_DIRA, PITCH_DIRB);
 
-    enable = 1; dir = 1; brake = 0; speed = 8'd80; // reverse, 80%
-    #5000;
+    // 1) forward: low -> medium -> high
+    enable = 1; dir = 0; brake = 0; speed = 8'd10; // forward, low
+    #3000;
+    speed = 8'd50; // forward, medium
+    #3000;
+    speed = 8'd90; // forward, high
+    #3000;
 
-    enable = 1; dir = 1; brake = 1; speed = 8'd50; // brake applied
-    #5000;
+    // 2) reverse at medium
+    enable = 1; dir = 1; brake = 0; speed = 8'd60;
+    #3000;
 
-    enable = 0; dir = 0; brake = 0; speed = 8'd0;  // disable
-    #20000;
+    // 3) brake while enabled (direction should be masked)
+    enable = 1; dir = 0; brake = 1; speed = 8'd60;
+    #2500;
+
+    // 4) brake with opposite direction set (still braking)
+    enable = 1; dir = 1; brake = 1; speed = 8'd60;
+    #2500;
+
+    // 5) release brake while enabled, change direction
+    brake = 0; dir = 0; speed = 8'd40; // should run forward at 40%
+    #3000;
+
+    // 6) quick enable/disable toggles
+    enable = 0; #1000;
+    enable = 1; speed = 8'd30; #1000;
+    enable = 0; #1000;
+
+    // 7) final disable and idle
+    enable = 0; dir = 0; brake = 0; speed = 8'd0;
+    #4000;
 
     $finish;
   end

@@ -23,44 +23,38 @@ module PWM_Motordriver (
 
   reg [31:0] loop_count = 0;
   reg [31:0] duty_cycle_loop = 0;
-
+  
+  // Simple, readable PWM logic: counter, duty calc, direction and PWM output
   always @(posedge clk) begin
-    loop_count <= loop_count + 1;
+    // advance counter and wrap
+    if (loop_count == PWM_PERIOD_COUNT - 1)
+      loop_count <= 0;
+    else
+      loop_count <= loop_count + 1;
 
-    // clamp incoming speed to 0..100
+    // clamp speed to 0..100 (store as 7-bit)
     speed_percentage <= (speed > 8'd100) ? 7'd100 : speed[6:0];
 
-    if (loop_count > 0) begin
-      PITCH_PWM_VAL <= 1;
+    // compute duty threshold (cycles motor is ON). keep SPEED_DIVIDER for now.
+    duty_cycle_loop <= (speed_percentage * PWM_PERIOD_COUNT) / (100 * SPEED_DIVIDER);
 
-      duty_cycle_loop <= (speed_percentage * PWM_PERIOD_COUNT) /
-                         (100 * SPEED_DIVIDER);
-
-      if (enable) begin
-        if (brake) begin
-          PITCH_DIRA <= 0;
-          PITCH_DIRB <= 0;
-        end else begin
-          if (dir) begin
-            PITCH_DIRA <= 1;
-            PITCH_DIRB <= 0;
-          end else begin
-            PITCH_DIRA <= 0;
-            PITCH_DIRB <= 1;
-          end
-        end
-      end else begin
-        PITCH_DIRA <= 0;
-        PITCH_DIRB <= 0;
-        PITCH_PWM_VAL <= 0;
-      end
+    // direction / brake / enable handling (kept simple)
+    if (!enable || brake) begin
+      PITCH_DIRA <= 0;
+      PITCH_DIRB <= 0;
+    end else if (dir) begin
+      PITCH_DIRA <= 1;
+      PITCH_DIRB <= 0;
+    end else begin
+      PITCH_DIRA <= 0;
+      PITCH_DIRB <= 1;
     end
 
-    if (loop_count >= duty_cycle_loop)
+    // PWM output: active-high while counter < duty
+    if (!enable || brake || (duty_cycle_loop == 0))
       PITCH_PWM_VAL <= 0;
-
-    if (loop_count == PWM_PERIOD_COUNT)
-      loop_count <= 0;
-
+    else
+      PITCH_PWM_VAL <= (loop_count < duty_cycle_loop) ? 1 : 0;
   end
+
 endmodule
