@@ -12,9 +12,10 @@ module PWM_Motordriver (
   output reg PITCH_PWM_VAL = 0
 );
 
-  parameter SPEED_DIVIDER = 4;
+  // Use a lower default PWM_FREQUENCY for simulation visibility (can be overridden for HW).
+  parameter SPEED_DIVIDER = 5;
   parameter CLK_FREQUENCY = 50_000_000;
-  parameter PWM_FREQUENCY = 20_000;
+  parameter PWM_FREQUENCY = 1000;
   localparam PWM_PERIOD_COUNT = CLK_FREQUENCY / PWM_FREQUENCY;
 
   // ---------------- PWM ----------------
