@@ -62,7 +62,13 @@ module DE10_NANO_SoC(
     output   [ 7: 0]    LED,
 
     //////////// SW //////////
-    input    [ 3: 0]    SW
+    input    [ 3: 0]    SW,
+	 
+	 ////////////Encoder///////
+	 input PITCH_ENC_A,
+	 input PITCH_ENC_B,
+	 input YAW_ENC_A,
+	 input YAW_ENC_B
 );
 
 
@@ -81,8 +87,22 @@ wire                fpga_clk_50;
 // connection of internal logics
 assign fpga_clk_50 = FPGA_CLK1_50;
 //assign  stm_hw_events = {{15{1'b0}}, SW, fpga_led_internal, fpga_debounced_buttons};
+wire [7:0] encoder_led;
+assign LED = encoder_led;
+
+/////////////////////// encoder
+Encoder u_encoder (
+    .FPGA_CLK1_50(FPGA_CLK1_50),
+    .PITCH_ENC_A(PITCH_ENC_A),
+    .PITCH_ENC_B(PITCH_ENC_B),
+    .YAW_ENC_A(YAW_ENC_A),
+    .YAW_ENC_B(YAW_ENC_B),
+    .LED(encoder_led),
+    .SW(SW)
+);
 
 
+//=======================================================
 
 //=======================================================
 //  Structural coding
@@ -110,8 +130,14 @@ soc_system u0(
                .memory_oct_rzqin(HPS_DDR3_RZQ),                             //                               .oct_rzqin
                //FPGA IO
                //NOTE: This probalby will have a different name
-               .esl_demo_export(LED),                                       //    led_pio_external_connection.export
-               .hps_0_h2f_reset_reset_n(hps_fpga_reset_n)                   //                hps_0_h2f_reset.reset_n
+               .esl_bus_demo_1_export(),                                       //    led_pio_external_connection.export
+               .hps_0_h2f_reset_reset_n(hps_fpga_reset_n),                  //                hps_0_h2f_reset.reset_n
+					
+                //ENCODERS
+                .esl_bus_demo_pitch_enc_a(PITCH_ENC_A),
+                .esl_bus_demo_pitch_enc_b(PITCH_ENC_B),
+                .esl_bus_demo_yaw_enc_a(YAW_ENC_A),
+                .esl_bus_demo_yaw_enc_b(YAW_ENC_B)
 
            );
 
