@@ -1,9 +1,12 @@
 Simple SPI regfile test (FPGA) and host client
 
+UPLOAD VERILOG
+time sudo ./compile_on_raspi.sh
+
 Build on Raspberry Pi:
 
 sudo apt install libbcm2835-dev
-gcc -o spi_client assignment_11/main.c -l bcm2835
+gcc -o spi_client main.c -l bcm2835
 
 Run (use sudo):
 

@@ -9,6 +9,7 @@
 #include <linux/spi/spidev.h>
 #include <linux/types.h>
 #include <stdint.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,8 +72,8 @@ int spiRead(int fd, unsigned speed, char *buf, unsigned count) {
 
   memset(&spi, 0, sizeof(spi));
 
-  spi.tx_buf = (unsigned)NULL;
-  spi.rx_buf = (unsigned)buf;
+  spi.tx_buf = (unsigned long)0;
+  spi.rx_buf = (unsigned long)buf;
   spi.len = count;
   spi.speed_hz = speed;
   spi.delay_usecs = 0;
@@ -90,8 +91,8 @@ int spiWrite(int fd, unsigned speed, char *buf, unsigned count) {
 
   memset(&spi, 0, sizeof(spi));
 
-  spi.tx_buf = (unsigned)buf;
-  spi.rx_buf = (unsigned)NULL;
+  spi.tx_buf = (unsigned long)buf;
+  spi.rx_buf = (unsigned long)NULL;
   spi.len = count;
   spi.speed_hz = speed;
   spi.delay_usecs = 0;
@@ -133,6 +134,7 @@ int loops = LOOPS;
 
 int main(int argc, char *argv[]) {
   int i, fd;
+  int j;
   double start, diff, sps;
 
   if (argc > 1)
@@ -161,12 +163,16 @@ int main(int argc, char *argv[]) {
     return 1;
 
   for (i = 0; i < loops; i++) {
-    if (i % 2) {
-      TXBuf[0] = 255;
-    } else {
-      TXBuf[0] = 0;
-    }
+    memset(TXBuf, 0, bytes);
+    TXBuf[0] = (i % 2) ? 255 : 0;
     spiXfer(fd, speed, TXBuf, RXBuf, bytes);
+
+    // Print TX and RX buffers
+    printf("[%d] TX:", i);
+    for (j = 0; j < bytes; j++) printf(" %02X", (unsigned char)TXBuf[j]);
+    printf("  RX:");
+    for (j = 0; j < bytes; j++) printf(" %02X", (unsigned char)RXBuf[j]);
+    printf("\n");
   }
 
   diff = time_time() - start;

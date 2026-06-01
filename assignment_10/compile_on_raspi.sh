@@ -1,7 +1,7 @@
 # spi has to off for flashing
 sudo dtparam spi=off
 
-yosys -p 'synth_ice40 -top SPI -json ice40.json' SPI.v
+yosys -p 'synth_ice40 -top TopEntity -json ice40.json' TopEntity.v
 
 nextpnr-ice40 --hx8k --json ice40.json --pcf ico-jiwy.pcf --asc ice40.asc
 

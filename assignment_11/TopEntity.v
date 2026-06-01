@@ -1,148 +1,187 @@
-// TopEntity: simple SPI slave that provides a 128x8 register file
-// Command format: command byte = [W|addr6:0]; W=1 write, W=0 read
+`include "PWM_motordriver.v"
 
 module TopEntity(
-    input  wire sys_clk,
-    input  wire rst_n,
+    input  wire clk,
 
-    // SPI pins (mode 0, MSB-first)
-    input  wire SPI_CLK,   // SCLK from master
-    input  wire SPI_PICO,  // MOSI (master out -> slave in)
-    output reg  SPI_POCI,  // MISO (slave out -> master in)
-    input  wire SPI_CS,    // CS (active low)
+    input  wire SPI_CLK,
+    input  wire SPI_PICO,
+    input  wire SPI_CS,
+    output reg  SPI_POCI,
 
-    // Motor output
-    output wire PWM_OUT
+    input  wire btn1,
+    input  wire btn2,
+
+    output wire led1,
+    output wire led2,
+    output wire led3,
+
+    output wire PITCH_PWM_VAL,
+    output wire PITCH_DIRA,
+    output wire PITCH_DIRB,
+
+    output wire PITCH_ENC_A,
+    output wire PITCH_ENC_B,
+
+    output wire YAW_PWM_VAL,
+    output wire YAW_DIRA,
+    output wire YAW_DIRB,
+
+    output wire YAW_ENC_A,
+    output wire YAW_ENC_B,
+
+    output wire pmod1_8,
+    output wire pmod1_9,
+    output wire pmod1_10,
+
+    output wire pmod2_8,
+    output wire pmod2_9,
+    output wire pmod2_10,
+
+    output wire pmod3_4,
+    output wire pmod3_9,
+    output wire pmod3_10,
+
+    output wire pmod4_1,
+    output wire pmod4_2,
+    output wire pmod4_3,
+    output wire pmod4_4,
+    output wire pmod4_7,
+    output wire pmod4_8,
+    output wire pmod4_9,
+    output wire pmod4_10
 );
 
-    // Simple register file
-    reg [7:0] regs [0:127];
-    localparam REG_SPEED = 8'h01; // bit7=dir, bits6:0=speed
-    localparam REG_FLAGS = 8'h02; // bit0=enable, bit1=brake
-    localparam REG_ENC_L = 8'h10; // encoder LSB
-    localparam REG_ENC_H = 8'h11; // encoder MSB
+// register for incomming bytes
+reg [7:0] byte_in;
+reg [2:0] bit_count;
 
-    integer idx;
-    initial begin
-        for (idx = 0; idx < 128; idx = idx + 1) regs[idx] = 8'h00;
-    end
+// the command names 0x01 or 0x02.
+localparam MOTOR1_COMMAND = 8'h01;
+localparam MOTOR2_COMMAND = 8'h02;
 
-    // Synchronize external SPI signals into sys_clk domain
-    reg [1:0] clk_sync = 2'b00;
-    reg [1:0] cs_sync  = 2'b11; // idle high
+// the command names 0x03
+localparam LED_COMMAND = 8'h03;
 
-    always @(posedge sys_clk or negedge rst_n) begin
-        if (!rst_n) begin
-            clk_sync <= 2'b00;
-            cs_sync  <= 2'b11;
-        end else begin
-            clk_sync <= {clk_sync[0], SPI_CLK};
-            cs_sync  <= {cs_sync[0],  SPI_CS };
-        end
-    end
+// store the current command state
+reg [7:0] current_command;
 
-    wire clk_rising = clk_sync[1] & ~clk_sync[0];
-    wire cs_active  = ~cs_sync[0];
-    wire cs_falling = (cs_sync[1] == 1'b1) && (cs_sync[0] == 1'b0);
-    wire cs_rising  = (cs_sync[1] == 1'b0) && (cs_sync[0] == 1'b1);
+// make a variable for the motor driver inputs.
+reg [4:0] pwm_speed;
+reg pwm_dir;
+reg pwm_enable;
+reg pwm_brake;
 
-    // SPI byte receiver/transmitter
-    reg [7:0] shift_rx;    // shift register for incoming bits
-    reg [7:0] shift_tx;    // shift register for outgoing bits
-    reg [2:0] bit_cnt;     // 7..0
-    reg       expect_cmd;  // true when next completed byte is command
-    reg       cmd_is_write;
-    reg [6:0] addr_ptr;
+// make a variable for the led state.
+reg led_state = 1'b0;
 
-    // Initialize and main SPI processing
-    always @(posedge sys_clk or negedge rst_n) begin
-        if (!rst_n) begin
-            shift_rx    <= 8'h00;
-            shift_tx    <= 8'hFE; // default ping reply
-            bit_cnt     <= 3'd7;
-            expect_cmd  <= 1'b1;
-            cmd_is_write<= 1'b0;
-            addr_ptr    <= 7'd0;
-            SPI_POCI    <= 1'b0;
-        end else begin
-            // on CS falling edge: start a transfer
-            if (cs_falling) begin
-                shift_tx   <= 8'hFE;
-                bit_cnt    <= 3'd7;
-                shift_rx   <= 8'h00;
-                expect_cmd <= 1'b1;
-            end
+// SPI sync
+reg [2:0] spi_clk_sync;
+reg [2:0] spi_cs_sync;
+reg [2:0] spi_mosi_sync;
 
-            // while CS is active, sample MOSI on SCLK rising and drive MISO
-            if (cs_active && clk_rising) begin
-                // drive MISO with current MSB
-                SPI_POCI <= shift_tx[7];
-                // rotate transmit register left (MSB consumed)
-                shift_tx <= {shift_tx[6:0], 1'b0};
+wire spi_clk_rise = (spi_clk_sync[2:1] == 2'b01);
+wire spi_cs_active = ~spi_cs_sync[2];
 
-                // sample MOSI into the current bit position (MSB-first)
-                shift_rx[bit_cnt] <= SPI_PICO;
+// encoder placeholder (14-bit)
+reg [13:0] encoder_value = 14'b00110011001100;
 
-                // when a full byte has been shifted in
-                if (bit_cnt == 3'd0) begin
-                    // process completed byte in shift_rx
-                    if (expect_cmd) begin
-                        // command byte: W(7) + addr(6:0)
-                        expect_cmd   <= 1'b0;
-                        cmd_is_write <= shift_rx[7];
-                        addr_ptr     <= shift_rx[6:0];
+// MISO shift register
+reg [15:0] miso_shift;
 
-                        // Prepare the first data byte for read commands
-                        if (!shift_rx[7]) begin
-                            // read: preload data from the addressed register
-                            if (shift_rx[6:0] == 7'd0)
-                                shift_tx <= ~regs[shift_rx[6:0]]; // special echo-flip for addr 0
-                            else
-                                shift_tx <= regs[shift_rx[6:0]];
-                        end
-                    end else begin
-                        // data phase
-                        if (cmd_is_write) begin
-                            // write incoming byte into register and advance address
-                            regs[addr_ptr] <= shift_rx;
-                            addr_ptr <= addr_ptr + 7'd1;
-                        end else begin
-                            // read data phase: master sent dummy, preload next byte
-                            addr_ptr <= addr_ptr + 7'd1;
-                            shift_tx <= regs[addr_ptr + 7'd1];
-                        end
-                    end
-                    bit_cnt <= 3'd7;
-                end else begin
-                    bit_cnt <= bit_cnt - 3'd1;
+// LED mapping (LED1 may be unreliable pin / routing)
+assign led1 = led_state;
+assign led2 = led_state;
+assign led3 = led_state;
+
+// PMOD / unused outputs tied low (safe default)
+assign pmod1_8  = 1'b0;
+assign pmod1_9  = 1'b0;
+assign pmod1_10 = 1'b0;
+
+assign pmod2_8  = 1'b0;
+assign pmod2_9  = 1'b0;
+assign pmod2_10 = 1'b0;
+
+assign pmod3_4  = 1'b0;
+assign pmod3_9  = 1'b0;
+assign pmod3_10 = 1'b0;
+
+assign pmod4_1  = 1'b0;
+assign pmod4_2  = 1'b0;
+assign pmod4_3  = 1'b0;
+assign pmod4_4  = 1'b0;
+assign pmod4_7  = 1'b0;
+assign pmod4_8  = 1'b0;
+assign pmod4_9  = 1'b0;
+assign pmod4_10 = 1'b0;
+
+// have the main clk loop of the fpga clock.
+always @(posedge clk) begin
+
+    // sync SPI signals into clk domain
+    spi_clk_sync  <= {spi_clk_sync[1:0], SPI_CLK};
+    spi_cs_sync   <= {spi_cs_sync[1:0], SPI_CS};
+    spi_mosi_sync <= {spi_mosi_sync[1:0], SPI_PICO};
+
+    if (!spi_cs_active) begin
+
+        bit_count <= 0;
+        current_command <= 8'h00;
+
+        miso_shift <= {2'b00, encoder_value};
+        SPI_POCI <= 1'b0;
+
+    end else begin
+
+        SPI_POCI <= miso_shift[15];
+
+        if (spi_clk_rise) begin
+
+            byte_in <= {byte_in[6:0], spi_mosi_sync[2]};
+            bit_count <= bit_count + 1;
+
+            miso_shift <= {miso_shift[14:0], 1'b0};
+
+            if (bit_count == 3'd7) begin
+
+                if (current_command == 8'h00) begin
+                    case ({byte_in[6:0], spi_mosi_sync[2]})
+                        MOTOR1_COMMAND: current_command <= MOTOR1_COMMAND;
+                        MOTOR2_COMMAND: current_command <= MOTOR2_COMMAND;
+                        LED_COMMAND:    current_command <= LED_COMMAND;
+                    endcase
+                end else if (current_command == MOTOR1_COMMAND) begin
+                    pwm_speed  <= byte_in[4:0];
+                    pwm_dir    <= byte_in[5];
+                    pwm_enable <= byte_in[6];
+                    pwm_brake  <= byte_in[7];
+                    current_command <= 8'h00;
+                end else if (current_command == MOTOR2_COMMAND) begin
+                    current_command <= 8'h00;
+                end else if (current_command == LED_COMMAND) begin
+                    led_state <= byte_in[0];
+                    current_command <= 8'h00;
                 end
+
             end
 
-            // on CS rising edge we end transfer; nothing automatic to do here
-            if (cs_rising) begin
-                // no-op: host controls state via regs
-            end
         end
     end
+end
 
-    // ---------------------------
-    // Map registers to PWM inputs so host controls speed over SPI
-    // REG_SPEED: bit7=dir, bits6:0=speed
-    // REG_FLAGS: bit0=enable, bit1=brake
-    wire [6:0] pwm_speed  = regs[REG_SPEED][6:0];
-    wire       pwm_dir    = regs[REG_SPEED][7];
-    wire       pwm_enable = regs[REG_FLAGS][0];
-    wire       pwm_brake  = regs[REG_FLAGS][1];
+// Instantiate PWM driver
+PWM_motordriver pwm (
+    .clk(clk),
+    .rst_n(btn1),
 
-    // Instantiate placeholder PWM driver
-    PWM_motordriver pwm (
-        .clk(sys_clk),
-        .rst_n(rst_n),
-        .speed(pwm_speed),
-        .dir(pwm_dir),
-        .enable(pwm_enable),
-        .brake(pwm_brake),
-        .pwm_out(PWM_OUT)
-    );
+    .speed(pwm_speed),
+    .dir(pwm_dir),
+    .enable(pwm_enable),
+    .brake(pwm_brake),
+
+    .pwm_out(PITCH_PWM_VAL),
+    .dirA(PITCH_DIRA),
+    .dirB(PITCH_DIRB)
+);
 
 endmodule
