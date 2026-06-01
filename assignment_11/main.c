@@ -61,6 +61,26 @@ static void send_led_command(uint8_t on) {
     hexdump("LED RX", rx, 2);
 }
 
+// LED ON helper (kept explicit for debugging SPI command timing)
+static void led_on(void) {
+    send_led_command(1);
+}
+
+// LED OFF helper (kept explicit for debugging SPI command timing)
+static void led_off(void) {
+    send_led_command(0);
+}
+
+// Blink LED N times with delay (usleep-based timing, host-side only)
+static void blink(int count, unsigned ms_delay) {
+    for (int i = 0; i < count; ++i) {
+        led_on();
+        usleep(ms_delay * 1000);
+        led_off();
+        usleep(ms_delay * 1000);
+    }
+}
+
 int main() {
     spi_init();
 
@@ -77,7 +97,7 @@ int main() {
 
         printf("probe1 [%d] RX: %02X %02X\n", i, rx[0], rx[1]);
 
-        // if FPGA is alive, it must not return all-zero (even weak misaligned patterns count)
+        // non-zero response indicates FPGA is actively driving MISO
         if (rx[0] != 0 || rx[1] != 0) nonzero = 1;
 
         usleep(5000);
@@ -119,37 +139,15 @@ int main() {
         printf("read [%d] TX: %02X %02X  RX: %02X %02X\n",
                i, tx[0], tx[1], rx[0], rx[1]);
 
-        // decoder expects 7-bit packing per byte (MSB used as framing flag)
+        // decoder expects 7-bit packed stream per byte
         parse_encoder_from_two_bytes(rx[0], rx[1]);
 
         usleep(10000);
     }
 
-    // Send LED command as a single two-byte transfer (command + data)
-    printf("Sending LED ON\n");
-    {
-        uint8_t tx[2] = { CMD_LED, 0x01 };
-        uint8_t rx[2] = {0,0};
-
-        xfer(tx, rx, 2);
-
-        hexdump("LED TX/RX", tx, 2);
-        hexdump("LED RX", rx, 2);
-    }
-
-	for(int i = 0; i < 10; ++i) {
-	    usleep(200000000);
-	}
-    printf("Sending LED OFF\n");
-    {
-        uint8_t tx[2] = { CMD_LED, 0x00 };
-        uint8_t rx[2] = {0,0};
-
-        xfer(tx, rx, 2);
-
-        hexdump("LED TX/RX", tx, 2);
-        hexdump("LED RX", rx, 2);
-    }
+    // Blink LED 5 times with 1 second delay
+    printf("Blinking LED 5 times (1s)\n");
+    blink(5, 1000);
 
     bcm2835_spi_end();
     bcm2835_close();
